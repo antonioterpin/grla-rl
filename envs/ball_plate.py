@@ -42,9 +42,9 @@ class BallPlate(Env):
     def __init__(
         self,
         desensitization: float = 0.0,
-        plate_radius_range: Tuple[float, float] = (5, 5.000001),
-        ball_mass_range: Tuple[float, float] = (0.1, 0.5),
-        plate_mass_range: Tuple[float, float] = (0.5, 1),
+        plate_radius_range: Tuple[float, float] = (2.5, 2.500000001),
+        ball_mass_range: Tuple[float, float] = (0.1, 0.2),
+        plate_mass_range: Tuple[float, float] = (0.1, 1),
         friction_ball_range: Tuple[float, float] = (0.03, 0.07),
         friction_plate_range: Tuple[float, float] = (0.08, 0.12),
         augment: bool = True,
@@ -243,8 +243,9 @@ class BallPlate(Env):
             # Compute the Jacobian of the dynamics function.
             jacobian_fn = jacobian(dynamics_fn, has_aux=True)
             jac, new_state = jacobian_fn(params)
-            # jax.debug.print("Jacobian: {}", jac)
-            penalty = jnp.sum(jnp.concatenate(jac) ** 2) * self.desensitization
+            jac = jnp.concatenate(jac)
+            d = jac.shape[0]
+            penalty = jnp.sum(jac ** 2) / d * self.desensitization
         else:
             # If no regularization, just compute the new state.
             new_state = dynamics_fn(params)[0]

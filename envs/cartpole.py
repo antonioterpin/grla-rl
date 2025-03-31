@@ -142,15 +142,17 @@ class CartPole(Env):
             return new_state, new_state
         
         penalty = 0.0
+        params = (state.length, state.masspole)
         if self.desensitization > 1e-7:
             # Compute the Jacobian of the dynamics function.
             jacobian_fn = jacobian(dynamics_fn, has_aux=True)
-            jac, new_state = jacobian_fn((state.length, state.masspole))
-            # jax.debug.print("Jacobian: {}", jac)
-            penalty = jnp.sum(jnp.concatenate(jac) ** 2) * self.desensitization
+            jac, new_state = jacobian_fn(params)
+            jac = jnp.concatenate(jac)
+            d = jac.shape[0]
+            penalty = jnp.sum(jac ** 2) / d * self.desensitization
         else:
             # If no regularization, just compute the new state.
-            new_state = dynamics_fn((state.length, state.masspole))[0]
+            new_state = dynamics_fn(params)[0]
 
 
         # Construct new state

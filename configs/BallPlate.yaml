@@ -1,5 +1,5 @@
 ppo:
-  num_timesteps: 50_000_000
+  num_timesteps: 100_000_000
   num_evals: 100
   reward_scaling: 10
   episode_length: 1000
@@ -18,11 +18,11 @@ ppo:
 experiment:
   regularizers:
     - 0
-    - 0.1
-    - 0.25
-    - 0.5
-    - 0.75
-    - 1.0
+    - 10
+    - 20
+    - 30
+    - 40
+    - 50
   noise:
     - 0
     - 0.1
