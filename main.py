@@ -6,14 +6,14 @@ import time
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from envs.inverted_pendulum import InvertedPendulum
 from envs.cartpole import CartPole
+from envs.ball_plate import BallPlate
 from brax.training.agents.ppo import train as ppo
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Train and test inverted pendulum model.")
-parser.add_argument('--regularizers', type=float, nargs='+', default=[0, 100, 500], help='List of regularizers.')
-parser.add_argument('--noise', type=float, nargs='+', default=[0, 9e-6, 1e-5, 2e-5, 3e-5], help='List of noises.')
+parser.add_argument('--regularizers', type=float, nargs='+', default=[0, 10, 20, 30, 40, 50, 100], help='List of regularizers.')
+parser.add_argument('--noise', type=float, nargs='+', default=[0, 0.1, 0.2, 0.3, 0.4, 0.5], help='List of noises.')
 parser.add_argument('--cuda_devices', type=str, default='0', help='CUDA visible devices.')
 args = parser.parse_args()
 
@@ -23,6 +23,11 @@ os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_devices
 REGULARIZERS = args.regularizers
 NOISE_STDS = jax.numpy.array(args.noise)
 DURATION = 1000
+n_steps = 100_000_000
+
+# env_from_reg_and_bias = lambda reg, bias: CartPole(desensitization=reg, noise_std=bias)
+env_from_reg_and_bias = lambda reg, bias: BallPlate(desensitization=reg, noise_std=bias)
+env_name = "BallPlate"
 
 # List to collect experiment results
 results_data = []
@@ -30,8 +35,7 @@ results_data = []
 for idx_reg, reg in enumerate(REGULARIZERS):
     print(f'Training with regularizer {reg}')
     # train with regularizer
-    # env = InvertedPendulum(desensitization=reg, params_bias=0)
-    env = CartPole(desensitization=reg)
+    env = env_from_reg_and_bias(reg, 0)
 
     # Define a progress callback function.
     def progress_callback(n_steps, metrics):
@@ -42,7 +46,7 @@ for idx_reg, reg in enumerate(REGULARIZERS):
         ))
     train_fn = functools.partial(
         ppo.train, 
-        num_timesteps=2_000_000, 
+        num_timesteps=n_steps, 
         num_evals=100, 
         reward_scaling=10, 
         episode_length=DURATION, 
@@ -65,7 +69,7 @@ for idx_reg, reg in enumerate(REGULARIZERS):
     # Test with error in params estimation
     for idx_bias, bias in enumerate(NOISE_STDS):
         print(f'Testing model regularized by {reg} with bias {bias}')
-        env = CartPole(desensitization=0, noise_std=bias)
+        env = env_from_reg_and_bias(0, bias)
 
         # JIT compile the environment functions.
         jit_env_reset = jax.jit(env.reset)
@@ -121,7 +125,7 @@ for idx_reg, reg in enumerate(REGULARIZERS):
 
 # Convert the results to a DataFrame and save to CSV.
 df_results = pd.DataFrame(results_data)
-csv_filename = "experiment_results.csv"
+csv_filename = f"results/{env_name}.csv"
 df_results.to_csv(csv_filename, index=False)
 print(f"Results saved to {csv_filename}")
 
@@ -139,7 +143,7 @@ plt.title("Mean Reward vs. Noise Bias for Different Regularizers")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plot_filename = "experiment_results_plot.png"
+plot_filename = f"results/{env_name}.png"
 plt.savefig(plot_filename)
 print(f"Plot saved to {plot_filename}")
 plt.show()
