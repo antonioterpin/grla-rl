@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from envs.cartpole import CartPole
-from envs.ball_plate import BallPlate
+from envs.ballplate import BallPlate
 from brax.training.agents.ppo import train as ppo
 import yaml
 

@@ -17,15 +17,14 @@ class CartPoleState:
     # Parameters (for each env instance)
     masspole: jnp.ndarray  # pole mass
     length: jnp.ndarray    # pole length
+    rng_noise: jax.random.PRNGKey # RNG for noise
 
     def tree_flatten(self):
         return (self.x, self.x_dot, self.theta, self.theta_dot,
-                self.masspole, self.length), None
+                self.masspole, self.length, self.rng_noise), None
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-        x, x_dot, theta, theta_dot, masspole, length = children
-        return cls(x=x, x_dot=x_dot, theta=theta, theta_dot=theta_dot,
-                   masspole=masspole, length=length)
+        return cls(*children)
 
 class CartPole(Env):
     def __init__(
@@ -67,7 +66,7 @@ class CartPole(Env):
         """
         Reset the environment. Returns the initial state and observation.
         """
-        rng, rng_state, rng_masspole, rng_length = jax.random.split(rng, 4)
+        rng, rng_state, rng_masspole, rng_length, rng_noise = jax.random.split(rng, 5)
         # Sample the four state variables uniformly in [-0.05, 0.05]
         state_sample = jax.random.uniform(
             rng_state, shape=(4,), minval=-0.05, maxval=0.05)
@@ -76,7 +75,7 @@ class CartPole(Env):
                                       minval=self.m_p_range[0], maxval=self.m_p_range[1])
         length = jax.random.uniform(rng_length, shape=(),
                                     minval=self.l_range[0], maxval=self.l_range[1])
-        state = CartPoleState(x, x_dot, theta, theta_dot, masspole, length)
+        state = CartPoleState(x, x_dot, theta, theta_dot, masspole, length, rng_noise)
         metrics = {}
         return State(
             pipeline_state=state,
@@ -98,7 +97,7 @@ class CartPole(Env):
             extra = jnp.stack([norm_masspole, norm_length], axis=-1)
 
             # Add noise to the augmented observation
-            noise = jax.random.normal(jax.random.PRNGKey(0), shape=extra.shape) * self.noise_std
+            noise = jax.random.normal(state.rng_noise, shape=extra.shape) * self.noise_std
             extra += noise
 
             obs = jnp.concatenate([obs, extra], axis=-1)
@@ -164,6 +163,7 @@ class CartPole(Env):
             theta_dot=theta_dot_new,
             masspole=state.masspole,
             length=state.length,
+            rng_noise=state.rng_noise,
         )
 
         obs = self._get_obs(new_state)

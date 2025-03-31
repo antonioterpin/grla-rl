@@ -23,13 +23,14 @@ class BallPlateState:
     plate_mass: jnp.ndarray       # plate mass (kg)
     friction_ball: jnp.ndarray    # friction coefficient between ball and plate
     friction_plate: jnp.ndarray   # damping/friction in plate rotation
+    rng_noise: jax.random.PRNGKey  # RNG for noise
 
     def tree_flatten(self):
         children = (
             self.x, self.y, self.x_dot, self.y_dot,
             self.theta_x, self.theta_y, self.theta_dot_x, self.theta_dot_y,
             self.ball_mass, self.plate_mass,
-            self.friction_ball, self.friction_plate,
+            self.friction_ball, self.friction_plate, self.rng_noise
         )
         return children, None
 
@@ -85,7 +86,7 @@ class BallPlate(Env):
         Reset the environment. The ball is initialized near the center and the plate is level.
         All physical parameters are sampled uniformly from their respective ranges.
         """
-        rng, rng_state, rng_radius, rng_ball_mass, rng_plate_mass, rng_friction_ball, rng_friction_plate = jax.random.split(rng, 7)
+        rng, rng_state, rng_ball_mass, rng_plate_mass, rng_friction_ball, rng_friction_plate, rng_noise = jax.random.split(rng, 7)
         # Sample ball state: [x, y, x_dot, y_dot] near zero.
         x, y, x_dot, y_dot = jax.random.uniform(
             rng_state, shape=(4,), minval=-0.05, maxval=0.05)
@@ -118,6 +119,7 @@ class BallPlate(Env):
             plate_mass=plate_mass,
             friction_ball=friction_ball,
             friction_plate=friction_plate,
+            rng_noise=rng_noise,
         )
         metrics = {}
         return State(
@@ -163,7 +165,7 @@ class BallPlate(Env):
                 norm_friction_plate
             ])
             # Add noise to the augmented observation
-            noise = jax.random.normal(jax.random.PRNGKey(0), shape=extra.shape) * self.noise_std
+            noise = jax.random.normal(state.rng_noise, shape=extra.shape) * self.noise_std
             extra += noise
             obs = jnp.concatenate([base_obs, extra], axis=-1)
         else:
@@ -254,6 +256,7 @@ class BallPlate(Env):
             plate_mass=state.plate_mass,
             friction_ball=state.friction_ball,
             friction_plate=state.friction_plate,
+            rng_noise=state.rng_noise,
         )
 
         distance = jnp.sqrt(new_x**2 + new_y**2)
