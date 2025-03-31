@@ -1,0 +1,32 @@
+ppo:
+  num_timesteps: 50_000_000
+  num_evals: 100
+  reward_scaling: 10
+  episode_length: 1000
+  normalize_observations: True
+  action_repeat: 1
+  unroll_length: 5
+  num_minibatches: 32
+  num_updates_per_batch: 4
+  discounting: 0.995
+  learning_rate: 0.0003
+  entropy_cost: 0.01
+  num_envs: 1024
+  batch_size: 1024
+  seed: 1
+
+experiment:
+  regularizers:
+    - 0
+    - 10
+    - 20
+    - 30
+    - 40
+    - 50
+  noise:
+    - 0
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.4
+    - 0.5

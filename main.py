@@ -9,25 +9,32 @@ import matplotlib.pyplot as plt
 from envs.cartpole import CartPole
 from envs.ball_plate import BallPlate
 from brax.training.agents.ppo import train as ppo
+import yaml
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Train and test inverted pendulum model.")
-parser.add_argument('--regularizers', type=float, nargs='+', default=[0, 10, 20, 30, 40, 50, 100], help='List of regularizers.')
-parser.add_argument('--noise', type=float, nargs='+', default=[0, 0.1, 0.2, 0.3, 0.4, 0.5], help='List of noises.')
+parser.add_argument('--env', type=str, default='BallPlate', help='Environment to use (CartPole or BallPlate).')
 parser.add_argument('--cuda_devices', type=str, default='0', help='CUDA visible devices.')
 args = parser.parse_args()
 
 # Set CUDA devices
 os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_devices
 
-REGULARIZERS = args.regularizers
-NOISE_STDS = jax.numpy.array(args.noise)
-DURATION = 1000
-n_steps = 100_000_000
+# Read params from config
+env_name = args.env
+config = yaml.safe_load(open(f'configs/{env_name}.yaml'))
+
+REGULARIZERS = config['experiment']['regularizers']
+NOISE_STDS = config['experiment']['noise']
 
 # env_from_reg_and_bias = lambda reg, bias: CartPole(desensitization=reg, noise_std=bias)
-env_from_reg_and_bias = lambda reg, bias: BallPlate(desensitization=reg, noise_std=bias)
-env_name = "BallPlate"
+
+if env_name == 'CartPole':
+    env_from_reg_and_bias = lambda reg, bias: CartPole(desensitization=reg, noise_std=bias)
+elif env_name == 'BallPlate':
+    env_from_reg_and_bias = lambda reg, bias: BallPlate(desensitization=reg, noise_std=bias)
+else:
+    raise ValueError(f"Unsupported environment: {env_name}")
 
 # List to collect experiment results
 results_data = []
@@ -44,23 +51,7 @@ for idx_reg, reg in enumerate(REGULARIZERS):
             +
             f" | Reward: {metrics['eval/episode_reward']:.4f}"
         ))
-    train_fn = functools.partial(
-        ppo.train, 
-        num_timesteps=n_steps, 
-        num_evals=100, 
-        reward_scaling=10, 
-        episode_length=DURATION, 
-        normalize_observations=True, 
-        action_repeat=1, 
-        unroll_length=5, 
-        num_minibatches=32, 
-        num_updates_per_batch=4, 
-        discounting=0.97, 
-        learning_rate=1e-3, 
-        entropy_cost=1e-2, 
-        num_envs=1024, 
-        batch_size=1024, 
-        seed=1)
+    train_fn = functools.partial(ppo.train, **config['ppo'])
 
     t_start = time.time()
     make_inference_fn, params, _ = train_fn(environment=env, progress_fn=progress_callback)
