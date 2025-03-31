@@ -122,9 +122,15 @@ print(f"Results saved to {csv_filename}")
 plt.figure(figsize=(8, 6))
 # Plot mean rewards with error bars for each regularizer value.
 for reg in sorted(df_results["regularizer"].unique()):
-    sub_df = df_results[df_results["regularizer"] == reg]
-    plt.errorbar(sub_df["bias"], sub_df["mean_reward"], yerr=sub_df["std_reward"],
-                 marker='o', linestyle='-', capsize=5, label=f"Regularizer {reg}")
+    # Plot only the mean rewards for the current regularizer.
+    subset = df_results[df_results["regularizer"] == reg]
+    plt.plot(
+        subset["bias"],
+        subset["mean_reward"],
+        label=f"Regularizer {reg}",
+        marker="o",
+        linestyle="--"
+    )
 
 plt.xlabel("Noise Standard Deviation (Bias)")
 plt.ylabel("Mean Reward")
