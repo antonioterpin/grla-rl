@@ -27,8 +27,6 @@ config = yaml.safe_load(open(f'configs/{env_name}.yaml'))
 REGULARIZERS = config['experiment']['regularizers']
 NOISE_STDS = config['experiment']['noise']
 
-# env_from_reg_and_bias = lambda reg, bias: CartPole(desensitization=reg, noise_std=bias)
-
 if env_name == 'CartPole':
     env_from_reg_and_bias = lambda reg, bias: CartPole(desensitization=reg, noise_std=bias)
 elif env_name == 'BallPlate':
@@ -91,7 +89,7 @@ for idx_reg, reg in enumerate(REGULARIZERS):
             # (In a fully vectorized version, you can’t break out early;
             # alternatively, you can use a while_loop and mask updates after 'done'.)
             (final_state, cumulative_reward), _ = jax.lax.scan(
-                step_fn, (state, cumulative_reward), None, length=DURATION
+                step_fn, (state, cumulative_reward), None, length=config['ppo']['episode_length']
             )
             return cumulative_reward
 

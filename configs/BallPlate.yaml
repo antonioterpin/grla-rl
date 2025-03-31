@@ -9,7 +9,7 @@ ppo:
   num_minibatches: 32
   num_updates_per_batch: 4
   discounting: 0.995
-  learning_rate: 0.0003
+  learning_rate: 0.0001
   entropy_cost: 0.01
   num_envs: 1024
   batch_size: 1024
