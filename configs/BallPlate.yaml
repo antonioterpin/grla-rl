@@ -18,11 +18,10 @@ ppo:
 experiment:
   regularizers:
     - 0
-    - 10
-    - 20
-    - 30
-    - 40
+    - 25
     - 50
+    - 75
+    - 100
   noise:
     - 0
     - 0.1

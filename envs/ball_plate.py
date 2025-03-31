@@ -19,7 +19,6 @@ class BallPlateState:
     theta_dot_x: jnp.ndarray  # plate angular velocity about the x-axis
     theta_dot_y: jnp.ndarray  # plate angular velocity about the y-axis
     # Physical parameters for the episode.
-    plate_radius: jnp.ndarray     # plate radius (m)
     ball_mass: jnp.ndarray        # ball mass (kg)
     plate_mass: jnp.ndarray       # plate mass (kg)
     friction_ball: jnp.ndarray    # friction coefficient between ball and plate
@@ -29,7 +28,7 @@ class BallPlateState:
         children = (
             self.x, self.y, self.x_dot, self.y_dot,
             self.theta_x, self.theta_y, self.theta_dot_x, self.theta_dot_y,
-            self.plate_radius, self.ball_mass, self.plate_mass,
+            self.ball_mass, self.plate_mass,
             self.friction_ball, self.friction_plate,
         )
         return children, None
@@ -42,17 +41,16 @@ class BallPlate(Env):
     def __init__(
         self,
         desensitization: float = 0.0,
-        plate_radius_range: Tuple[float, float] = (2.5, 2.500000001),
         ball_mass_range: Tuple[float, float] = (0.1, 0.2),
-        plate_mass_range: Tuple[float, float] = (0.1, 1),
+        plate_mass_range: Tuple[float, float] = (0.3, 1),
         friction_ball_range: Tuple[float, float] = (0.03, 0.07),
         friction_plate_range: Tuple[float, float] = (0.08, 0.12),
         augment: bool = True,
         noise_std: float = 0.0,
         max_torque: float = 1,  # maximum torque (N·m) applied to plate
     ):
+        self.plate_radius = 5.0  # radius of the plate (m)
         self.desensitization = desensitization
-        self.plate_radius_range = plate_radius_range
         self.ball_mass_range = ball_mass_range
         self.plate_mass_range = plate_mass_range
         self.friction_ball_range = friction_ball_range
@@ -95,9 +93,6 @@ class BallPlate(Env):
         theta_x, theta_y, theta_dot_x, theta_dot_y = jax.random.uniform(
             rng_state, shape=(4,), minval=-0.05, maxval=0.05)
         # Sample physical parameters from their respective ranges.
-        plate_radius = jax.random.uniform(
-            rng_radius, shape=(), minval=self.plate_radius_range[0], maxval=self.plate_radius_range[1]
-        )
         ball_mass = jax.random.uniform(
             rng_ball_mass, shape=(), minval=self.ball_mass_range[0], maxval=self.ball_mass_range[1]
         )
@@ -119,7 +114,6 @@ class BallPlate(Env):
             theta_y=theta_y,
             theta_dot_x=theta_dot_x,
             theta_dot_y=theta_dot_y,
-            plate_radius=plate_radius,
             ball_mass=ball_mass,
             plate_mass=plate_mass,
             friction_ball=friction_ball,
@@ -146,10 +140,6 @@ class BallPlate(Env):
             state.theta_x, state.theta_y, state.theta_dot_x, state.theta_dot_y
         ])
         if self.augment:
-            # Normalize the plate radius.
-            norm_plate_radius = (state.plate_radius - self.plate_radius_range[0]) / (
-                self.plate_radius_range[1] - self.plate_radius_range[0]
-            )
             # Normalize the ball mass.
             norm_ball_mass = (state.ball_mass - self.ball_mass_range[0]) / (
                 self.ball_mass_range[1] - self.ball_mass_range[0]
@@ -167,7 +157,6 @@ class BallPlate(Env):
                 self.friction_plate_range[1] - self.friction_plate_range[0]
             )
             extra = jnp.array([
-                norm_plate_radius,
                 norm_ball_mass,
                 norm_plate_mass,
                 norm_friction_ball,
@@ -200,11 +189,11 @@ class BallPlate(Env):
 
         def dynamics_fn(params):
             # Unpack physical parameters.
-            plate_radius, ball_mass, plate_mass, friction_ball, friction_plate = params
+            ball_mass, plate_mass, friction_ball, friction_plate = params
 
             # --- Plate dynamics ---
             # Compute moment of inertia of a disk (about a horizontal axis): I = 0.5 * m_plate * (plate_radius)^2.
-            I_plate = 0.5 * plate_mass * (plate_radius ** 2)
+            I_plate = 0.5 * plate_mass * (self.plate_radius ** 2)
             torque_x, torque_y = action[0], action[1]
             theta_ddot_x = (torque_x - friction_plate * theta_dot_x) / I_plate
             theta_ddot_y = (torque_y - friction_plate * theta_dot_y) / I_plate
@@ -236,7 +225,7 @@ class BallPlate(Env):
 
         penalty = 0.0
         params = (
-            state.plate_radius, state.ball_mass, state.plate_mass,
+            state.ball_mass, state.plate_mass,
             state.friction_ball, state.friction_plate
         )
         if self.desensitization > 1e-7:
@@ -261,7 +250,6 @@ class BallPlate(Env):
             theta_y=new_theta_y,
             theta_dot_x=new_theta_dot_x,
             theta_dot_y=new_theta_dot_y,
-            plate_radius=state.plate_radius,
             ball_mass=state.ball_mass,
             plate_mass=state.plate_mass,
             friction_ball=state.friction_ball,
@@ -270,7 +258,7 @@ class BallPlate(Env):
 
         distance = jnp.sqrt(new_x**2 + new_y**2)
         reward = 1.0 - penalty
-        done = jnp.where(distance > state.plate_radius ** 2, 1.0, 0.0)
+        done = jnp.where(distance > self.plate_radius ** 2, 1.0, 0.0)
 
         return brax_state.replace(
             pipeline_state=new_state,
@@ -284,7 +272,6 @@ if __name__ == "__main__":
     env = BallPlate(
         desensitization=0.0,
         noise_std=0.0,
-        plate_radius_range=(1.0, 1.5),
         ball_mass_range=(0.08, 0.12),
         plate_mass_range=(0.8, 1.2),
         friction_ball_range=(0.03, 0.07),
@@ -313,11 +300,9 @@ if __name__ == "__main__":
     plt.ylabel('Y Position (m)')
     plt.legend()
     plt.title('Nonlinear Ball and Plate Dynamics with Randomized Parameters')
-    circle1 = plt.Circle((0, 0), env.plate_radius_range[0], color='r', fill=False, linestyle='--', label='Min Plate Radius')
-    circle2 = plt.Circle((0, 0), env.plate_radius_range[1], color='r', fill=False, linestyle='--', label='Max Plate Radius')
+    circle1 = plt.Circle((0, 0), env.plate_radius, color='r', fill=False, linestyle='--', label='Plate radius')
     plt.gca().add_artist(circle1)
-    plt.gca().add_artist(circle2)
-    plt.gca().set_xlim(-env.plate_radius_range[1] - 0.1, env.plate_radius_range[1] + 0.1)
-    plt.gca().set_ylim(-env.plate_radius_range[1] - 0.1, env.plate_radius_range[1] + 0.1)
+    plt.gca().set_xlim(-env.plate_radius - 0.1, env.plate_radius + 0.1)
+    plt.gca().set_ylim(-env.plate_radius - 0.1, env.plate_radius + 0.1)
     plt.gca().set_aspect('equal', adjustable='box')
     plt.savefig('ball_plate_randomized_parameters.png')
